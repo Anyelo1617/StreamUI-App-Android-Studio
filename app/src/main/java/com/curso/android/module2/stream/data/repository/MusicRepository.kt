@@ -3,6 +3,7 @@ package com.curso.android.module2.stream.data.repository
 import com.curso.android.module2.stream.data.model.Category
 import com.curso.android.module2.stream.data.model.Playlist
 import com.curso.android.module2.stream.data.model.Song
+import kotlinx.coroutines.flow.Flow
 
 /**
  * ================================================================================
@@ -91,4 +92,8 @@ interface MusicRepository {
      * @return Lista de playlists guardadas
      */
     fun getPlaylists(): List<Playlist>
+
+    fun getSongs(): Flow<List<Song>>
+    fun toggleFavorite(songId: String)
+
 }

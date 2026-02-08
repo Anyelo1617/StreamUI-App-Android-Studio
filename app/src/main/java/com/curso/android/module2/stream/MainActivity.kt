@@ -1,5 +1,6 @@
 package com.curso.android.module2.stream
 
+/*Imports*/
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -50,34 +51,85 @@ import kotlin.reflect.KClass
 
 /**
  * ================================================================================
- * MAIN ACTIVITY - Punto de Entrada de la UI
+ * CONCEPTOS TEÓRICOS Y ARQUITECTURA GENERAL
  * ================================================================================
- *
- * SINGLE ACTIVITY ARCHITECTURE
- * ----------------------------
+
+
+ * 1. MAIN ACTIVITY & SINGLE ACTIVITY ARCHITECTURE
+ * -----------------------------------------------
  * En apps Compose modernas, típicamente usamos UNA sola Activity.
  * Toda la navegación se maneja internamente con Navigation Compose.
- *
+
+
  * Ventajas:
  * - Navegación más fluida (sin recrear Activities)
  * - Estado compartido más fácil
  * - Transiciones personalizables
  * - Mejor integración con Compose
- *
- * COMPONENTES CLAVE:
- * ------------------
- * 1. ComponentActivity: Base moderna para Compose
- * 2. setContent { }: Establece la raíz del árbol de Compose
- * 3. NavHost: Contenedor de destinos de navegación
- * 4. NavController: Controla la navegación (back stack)
- * 5. NavigationBar: Barra de navegación inferior (Bottom Navigation)
- *
- * EDGE TO EDGE:
- * -------------
+
+
+ * Componentes Clave:
+ * - ComponentActivity: Base moderna para Compose
+ * - setContent { }: Establece la raíz del árbol de Compose
+ * - NavHost: Contenedor de destinos de navegación
+ * - NavController: Controla la navegación (back stack)
+ * - NavigationBar: Barra de navegación inferior (Bottom Navigation)
+
+
+ * 2. EDGE TO EDGE
+ * ---------------
  * enableEdgeToEdge() hace que la app dibuje detrás de las barras
  * del sistema (status bar, navigation bar). Esto permite UIs
  * más inmersivas con colores personalizados en las barras.
+ *
+ * 3. BOTTOM NAVIGATION ARCHITECTURE
+ * ---------------------------------
+ * ESTRUCTURA:
+ * La app tiene 3 tabs principales (Home, Search, Library) accesibles
+ * desde el BottomNavigation. El Player es una pantalla de detalle
+ * que se abre sobre cualquier tab.
+ *
+ * ```
+ * ┌─────────────────────────────────┐
+ * │          TopAppBar              │
+ * ├─────────────────────────────────┤
+ * │                                 │
+ * │     Content (Home/Search/       │
+ * │     Library/Player)             │
+ * │                                 │
+ * ├─────────────────────────────────┤
+ * │  Home  │  Search  │  Library    │  ← BottomNavigation
+ * └─────────────────────────────────┘
+ * ```
+
+ * NAVEGACIÓN ENTRE TABS:
+ * Usamos navigate() con opciones especiales para tabs:
+ * - popUpTo(findStartDestination): Evita acumular back stack
+ * - saveState/restoreState: Preserva el estado de cada tab
+ * - launchSingleTop: Evita múltiples instancias del mismo destino
+
+ * 4. PATRÓN BOTTOM NAV ITEM
+ * -------------------------
+ * Cada item tiene:
+ * - route: La clase de destino para navegación type-safe
+ * - label: Texto que se muestra debajo del ícono
+ * - selectedIcon: Ícono cuando el tab está seleccionado (filled)
+ * - unselectedIcon: Ícono cuando el tab no está seleccionado (outlined)
+
+
+ * ICONOS FILLED vs OUTLINED:
+ * Es una convención de Material Design usar iconos filled para
+ * el estado seleccionado y outlined para el no seleccionado.
+ * Esto proporciona feedback visual claro al usuario.
+
+
+ * 5. TYPE-SAFE NAVIGATION (Navigation 2.8+)
+ * -----------------------------------------
+ * En lugar de strings para las rutas, usamos tipos:
+ * - composable<HomeDestination> { } en lugar de composable("home") { }
+ * - navController.navigate(PlayerDestination(id)) en lugar de navigate("player/$id")
  */
+
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,12 +140,9 @@ class MainActivity : ComponentActivity() {
 
         /**
          * setContent { }
-         * --------------
          * Establece el contenido de la Activity usando Compose.
          * Todo lo que está dentro es un árbol de Composables.
-         *
-         * Este es el ÚNICO lugar donde conectamos el mundo tradicional
-         * de Android (Activities) con el mundo de Compose.
+         * Este es el ÚNICO lugar donde conectamos el mundo tradicional de Android (Activities) con el mundo de Compose.
          */
         setContent {
             StreamUITheme {
@@ -104,23 +153,7 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * ================================================================================
- * BOTTOM NAVIGATION ITEM
- * ================================================================================
- *
  * Define los elementos del BottomNavigation con sus propiedades.
- *
- * PATRÓN: Cada item tiene:
- * - route: La clase de destino para navegación type-safe
- * - label: Texto que se muestra debajo del ícono
- * - selectedIcon: Ícono cuando el tab está seleccionado (filled)
- * - unselectedIcon: Ícono cuando el tab no está seleccionado (outlined)
- *
- * ICONOS FILLED vs OUTLINED:
- * -------------------------
- * Es una convención de Material Design usar iconos filled para
- * el estado seleccionado y outlined para el no seleccionado.
- * Esto proporciona feedback visual claro al usuario.
  */
 data class BottomNavItem(
     val route: KClass<*>,
@@ -131,7 +164,7 @@ data class BottomNavItem(
 
 /**
  * Lista de items del BottomNavigation.
- *
+
  * Nota: Para el ícono de Library usamos un recurso drawable personalizado
  * ya que Icons.Default no incluye un ícono de biblioteca de música apropiado.
  * Se usa el mismo ícono para ambos estados (selected/unselected) como fallback.
@@ -169,45 +202,13 @@ fun getBottomNavItems(): List<BottomNavItem> {
  * 2. NavController para manejar navegación
  * 3. Scaffold con TopAppBar y BottomNavigation
  * 4. NavHost con los destinos de la app
- *
- * ================================================================================
- * BOTTOM NAVIGATION ARCHITECTURE
- * ================================================================================
- *
- * ESTRUCTURA:
- * -----------
- * La app tiene 3 tabs principales (Home, Search, Library) accesibles
- * desde el BottomNavigation. El Player es una pantalla de detalle
- * que se abre sobre cualquier tab.
- *
- * ```
- *     ┌─────────────────────────────────┐
- *     │          TopAppBar              │
- *     ├─────────────────────────────────┤
- *     │                                 │
- *     │     Content (Home/Search/       │
- *     │     Library/Player)             │
- *     │                                 │
- *     ├─────────────────────────────────┤
- *     │  Home  │  Search  │  Library    │  ← BottomNavigation
- *     └─────────────────────────────────┘
- * ```
- *
- * NAVEGACIÓN ENTRE TABS:
- * ----------------------
- * Usamos navigate() con opciones especiales para tabs:
- * - popUpTo(findStartDestination): Evita acumular back stack
- * - saveState/restoreState: Preserva el estado de cada tab
- * - launchSingleTop: Evita múltiples instancias del mismo destino
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StreamUIApp() {
     /**
      * rememberNavController()
-     * -----------------------
      * Crea y recuerda un NavController.
-     *
      * "Remember" significa que sobrevive recomposiciones.
      * El NavController mantiene el back stack de navegación.
      */
@@ -215,7 +216,6 @@ fun StreamUIApp() {
 
     /**
      * koinInject()
-     * ------------
      * Obtiene una dependencia del contenedor de Koin.
      * Aquí inyectamos el repository para buscar canciones por ID.
      */
@@ -223,7 +223,6 @@ fun StreamUIApp() {
 
     /**
      * currentBackStackEntryAsState()
-     * ------------------------------
      * Observa el estado actual del back stack como State.
      * Se recompone automáticamente cuando cambia el destino.
      *
@@ -235,7 +234,6 @@ fun StreamUIApp() {
 
     /**
      * Determinar si mostrar el BottomNavigation
-     * -----------------------------------------
      * El BottomNavigation solo se muestra en los tabs principales.
      * Se oculta en pantallas de detalle como Player.
      */
@@ -246,7 +244,6 @@ fun StreamUIApp() {
 
     /**
      * Título dinámico del TopAppBar
-     * -----------------------------
      * Cambia según la pantalla actual para dar contexto al usuario.
      */
     val topBarTitle = when {
@@ -264,7 +261,6 @@ fun StreamUIApp() {
         Scaffold(
             /**
              * TOP APP BAR
-             * -----------
              * Barra superior con el título de la pantalla actual.
              */
             topBar = {
@@ -282,9 +278,7 @@ fun StreamUIApp() {
             },
             /**
              * BOTTOM NAVIGATION BAR
-             * ---------------------
              * NavigationBar es el componente Material 3 para bottom navigation.
-             *
              * Diferencias con Material 2:
              * - Material 2: BottomNavigation
              * - Material 3: NavigationBar
@@ -297,7 +291,6 @@ fun StreamUIApp() {
                         bottomNavItems.forEach { item ->
                             /**
                              * ESTADO SELECCIONADO
-                             * -------------------
                              * Usamos hierarchy para verificar si el destino actual
                              * está en la jerarquía del item. Esto maneja correctamente
                              * el caso de destinos anidados.
@@ -311,21 +304,20 @@ fun StreamUIApp() {
                                 onClick = {
                                     /**
                                      * NAVEGACIÓN DE TABS
-                                     * ------------------
                                      * La navegación entre tabs requiere opciones especiales:
-                                     *
+
                                      * popUpTo(findStartDestination):
                                      * - Limpia el back stack hasta el destino inicial
                                      * - Evita que se acumulen múltiples screens
-                                     *
+
                                      * saveState = true:
                                      * - Guarda el estado del tab actual antes de salir
                                      * - Preserva scroll position, campos de texto, etc.
-                                     *
+
                                      * restoreState = true:
                                      * - Restaura el estado del tab al que navegamos
                                      * - El usuario vuelve donde estaba en ese tab
-                                     *
+
                                      * launchSingleTop = true:
                                      * - Evita crear múltiples instancias del mismo destino
                                      * - Si ya estás en Home, tocar Home no crea otro Home
@@ -360,18 +352,11 @@ fun StreamUIApp() {
         ) { paddingValues ->
             /**
              * NAVHOST: Contenedor de Navegación
-             * ----------------------------------
              * NavHost define el grafo de navegación de la app.
-             *
+
              * Parámetros:
              * - navController: Controla la navegación
              * - startDestination: Destino inicial (HomeDestination)
-             *
-             * TYPE-SAFE NAVIGATION (Navigation 2.8+):
-             * ---------------------------------------
-             * En lugar de strings para las rutas, usamos tipos:
-             * - composable<HomeDestination> { } en lugar de composable("home") { }
-             * - navController.navigate(PlayerDestination(id)) en lugar de navigate("player/$id")
              */
             NavHost(
                 navController = navController,
@@ -380,9 +365,7 @@ fun StreamUIApp() {
             ) {
                 /**
                  * DESTINO: Home Screen
-                 * --------------------
                  * composable<T> define un destino para el tipo T.
-                 *
                  * HomeDestination es un object (sin argumentos),
                  * por lo que el lambda no necesita extraer nada.
                  */
@@ -391,9 +374,8 @@ fun StreamUIApp() {
                         onSongClick = { song ->
                             /**
                              * NAVEGACIÓN TYPE-SAFE
-                             * --------------------
                              * Navegamos a PlayerDestination pasando el songId.
-                             *
+
                              * El compilador verifica que:
                              * - PlayerDestination existe
                              * - songId es del tipo correcto (String)
@@ -405,9 +387,8 @@ fun StreamUIApp() {
 
                 /**
                  * DESTINO: Search Screen
-                 * ----------------------
                  * SearchDestination es un object (sin argumentos).
-                 *
+
                  * Esta pantalla es parte del BottomNavigation.
                  * Permite buscar canciones y navegar al Player.
                  */
@@ -416,9 +397,8 @@ fun StreamUIApp() {
                         onSongClick = { song ->
                             /**
                              * REUTILIZACIÓN DE DESTINOS
-                             * -------------------------
                              * Usamos el MISMO PlayerDestination que usa HomeScreen.
-                             *
+
                              * Esto demuestra que los destinos son reutilizables:
                              * - No importa DESDE DÓNDE navegas
                              * - Solo importa A DÓNDE vas y con qué datos
@@ -451,11 +431,10 @@ fun StreamUIApp() {
 
                 /**
                  * DESTINO: Player Screen
-                 * ----------------------
                  * PlayerDestination es una data class con argumentos.
-                 *
+
                  * toRoute<T>() extrae los argumentos de forma type-safe.
-                 *
+
                  * El Player es una pantalla de detalle que se abre sobre
                  * cualquier tab. El BottomNavigation se oculta cuando
                  * estamos en esta pantalla.
@@ -472,7 +451,6 @@ fun StreamUIApp() {
                         onBackClick = {
                             /**
                              * popBackStack()
-                             * --------------
                              * Navega hacia atrás en el back stack.
                              * Vuelve al tab desde donde se abrió el Player.
                              */

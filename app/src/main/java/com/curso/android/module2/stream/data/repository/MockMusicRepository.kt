@@ -4,6 +4,11 @@ import com.curso.android.module2.stream.data.model.Category
 import com.curso.android.module2.stream.data.model.Playlist
 import com.curso.android.module2.stream.data.model.Song
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+
 /**
  * ================================================================================
  * MOCK MUSIC REPOSITORY
@@ -38,13 +43,17 @@ import com.curso.android.module2.stream.data.model.Song
  */
 class MockMusicRepository : MusicRepository {
 
+    // SINGLE SOURCE OF TRUTH (Mutable)
+    // Inicializamos el flujo con los datos estáticos del companion object
+    private val _categoriesFlow = MutableStateFlow(categories)
+
     /**
      * Obtiene todas las categorías con sus canciones.
      *
      * En una app real, esto sería una función suspend que haría una
      * llamada a red o base de datos. Aquí retornamos datos estáticos.
      */
-    override fun getCategories(): List<Category> = categories
+    override fun getCategories(): List<Category> = _categoriesFlow.value
 
     /**
      * Busca una canción por su ID.
@@ -55,7 +64,7 @@ class MockMusicRepository : MusicRepository {
      * Nota: flatMap aplana la lista de listas de canciones en una sola lista
      */
     override fun getSongById(songId: String): Song? {
-        return categories
+        return _categoriesFlow.value
             .flatMap { it.songs }
             .find { it.id == songId }
     }
@@ -78,6 +87,44 @@ class MockMusicRepository : MusicRepository {
      * @return Lista de playlists guardadas
      */
     override fun getPlaylists(): List<Playlist> = playlists
+
+
+    /**
+     * Obtenemos todas las canciones de todas las categorías como un Flow reactivo.
+     * Cuando cambia un favorito, este Flow emite la nueva lista automáticamente.
+     */
+    override fun getSongs(): Flow<List<Song>> {
+        return _categoriesFlow.map { currentCategories ->
+            currentCategories.flatMap { it.songs }
+        }
+    }
+
+    /**
+     * Lógica "Deep Copy" para actualizar un favorito dentro de una estructura anidada.
+     */
+    override fun toggleFavorite(songId: String) {
+        _categoriesFlow.update { currentCategories ->
+            currentCategories.map { category ->
+                // Verificamos si la canción está en esta categoría
+                val containsSong = category.songs.any { it.id == songId }
+
+                if (containsSong) {
+                    // Reconstruimos la categoría con la canción actualizada
+                    category.copy(
+                        songs = category.songs.map { song ->
+                            if (song.id == songId) {
+                                song.copy(isFavorite = !song.isFavorite)
+                            } else {
+                                song
+                            }
+                        }
+                    )
+                } else {
+                    category // Si no está aquí, devolvemos la categoría tal cual
+                }
+            }
+        }
+    }
 
     companion object {
         /**
