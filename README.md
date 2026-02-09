@@ -141,3 +141,7 @@ Proyecto generado usando [Claude Code](https://claude.com/code) y adaptado por *
 - [Koin Documentation](https://insert-koin.io/docs/quickstart/android-compose/)
 - [State and Jetpack Compose](https://developer.android.com/develop/ui/compose/state)
 - [Navigation Compose](https://developer.android.com/develop/ui/compose/navigation)
+
+
+Link al video explicativo:
+https://www.youtube.com/@AnyeloArthurS%C3%A1nchezNaranjo
