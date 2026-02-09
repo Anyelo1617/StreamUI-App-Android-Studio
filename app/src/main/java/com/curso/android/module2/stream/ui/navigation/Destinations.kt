@@ -85,6 +85,14 @@ data object HomeDestination
 data object SearchDestination
 
 /**
+* HighlightsDestination reemplaza a LibraryDestination.
+* Esta será la tercera pestaña del BottomNavigation.
+**/
+
+@Serializable
+data object HighlightsDestination
+
+/**
  * Destino: Pantalla de Biblioteca (Library)
  *
  * Muestra las playlists guardadas del usuario.
@@ -96,8 +104,9 @@ data object SearchDestination
  * los tabs del BottomNavigation. Cada una tiene su propio ViewModel
  * y mantiene su estado independiente.
  */
-@Serializable
+/**@Serializable
 data object LibraryDestination
+**/
 
 /**
  * Destino: Pantalla del Reproductor

@@ -1,11 +1,13 @@
 package com.curso.android.module2.stream.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope // AGREGADO: Necesario para corrutinas
 import com.curso.android.module2.stream.data.model.Playlist
 import com.curso.android.module2.stream.data.repository.MusicRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch // AGREGADO: Necesario para lanzar la recolección
 
 /**
  * ================================================================================
@@ -67,13 +69,22 @@ class LibraryViewModel(
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
     init {
-        loadPlaylists()
+        // En lugar de cargar una sola vez, observamos el flujo de canciones.
+        // Cada vez que cambia una canción (ej. toggleFavorite) se recarga las playlists
+        // y así el contador de "My Favorites" se actualice en tiempo real.
+        viewModelScope.launch {
+            repository.getSongs().collect {
+                loadPlaylists()
+            }
+        }
     }
 
     /**
      * Carga las playlists del usuario.
      */
     private fun loadPlaylists() {
+        // Nota: En una app real con red, quizás no querrías poner Loading en cada refresh leve,
+        // pero para este mock local es instantáneo y asegura consistencia.
         _uiState.value = LibraryUiState.Loading
 
         val playlists = repository.getPlaylists()

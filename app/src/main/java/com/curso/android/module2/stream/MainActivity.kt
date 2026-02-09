@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star // AGREGADO: Icono Filled para Highlights
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Star // AGREGADO: Icono Outlined para Highlights
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -37,12 +38,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.curso.android.module2.stream.data.repository.MusicRepository
+import com.curso.android.module2.stream.ui.navigation.HighlightsDestination // CAMBIO: Highlights
 import com.curso.android.module2.stream.ui.navigation.HomeDestination
-import com.curso.android.module2.stream.ui.navigation.LibraryDestination
 import com.curso.android.module2.stream.ui.navigation.PlayerDestination
 import com.curso.android.module2.stream.ui.navigation.SearchDestination
+import com.curso.android.module2.stream.ui.screens.HighlightsScreen // CAMBIO: Highlights Screen
 import com.curso.android.module2.stream.ui.screens.HomeScreen
-import com.curso.android.module2.stream.ui.screens.LibraryScreen
 import com.curso.android.module2.stream.ui.screens.PlayerScreen
 import com.curso.android.module2.stream.ui.screens.SearchScreen
 import com.curso.android.module2.stream.ui.theme.StreamUITheme
@@ -53,29 +54,25 @@ import kotlin.reflect.KClass
  * ================================================================================
  * CONCEPTOS TEÓRICOS Y ARQUITECTURA GENERAL
  * ================================================================================
-
-
+ *
  * 1. MAIN ACTIVITY & SINGLE ACTIVITY ARCHITECTURE
  * -----------------------------------------------
  * En apps Compose modernas, típicamente usamos UNA sola Activity.
  * Toda la navegación se maneja internamente con Navigation Compose.
-
-
+ *
  * Ventajas:
  * - Navegación más fluida (sin recrear Activities)
  * - Estado compartido más fácil
  * - Transiciones personalizables
  * - Mejor integración con Compose
-
-
+ *
  * Componentes Clave:
  * - ComponentActivity: Base moderna para Compose
  * - setContent { }: Establece la raíz del árbol de Compose
  * - NavHost: Contenedor de destinos de navegación
  * - NavController: Controla la navegación (back stack)
  * - NavigationBar: Barra de navegación inferior (Bottom Navigation)
-
-
+ *
  * 2. EDGE TO EDGE
  * ---------------
  * enableEdgeToEdge() hace que la app dibuje detrás de las barras
@@ -85,7 +82,7 @@ import kotlin.reflect.KClass
  * 3. BOTTOM NAVIGATION ARCHITECTURE
  * ---------------------------------
  * ESTRUCTURA:
- * La app tiene 3 tabs principales (Home, Search, Library) accesibles
+ * La app tiene 3 tabs principales (Home, Search, Highlights) accesibles
  * desde el BottomNavigation. El Player es una pantalla de detalle
  * que se abre sobre cualquier tab.
  *
@@ -95,19 +92,19 @@ import kotlin.reflect.KClass
  * ├─────────────────────────────────┤
  * │                                 │
  * │     Content (Home/Search/       │
- * │     Library/Player)             │
+ * │     Highlights/Player)          │
  * │                                 │
  * ├─────────────────────────────────┤
- * │  Home  │  Search  │  Library    │  ← BottomNavigation
+ * │  Home  │  Search  │ Highlights  │  ← BottomNavigation
  * └─────────────────────────────────┘
  * ```
-
+ *
  * NAVEGACIÓN ENTRE TABS:
  * Usamos navigate() con opciones especiales para tabs:
  * - popUpTo(findStartDestination): Evita acumular back stack
  * - saveState/restoreState: Preserva el estado de cada tab
  * - launchSingleTop: Evita múltiples instancias del mismo destino
-
+ *
  * 4. PATRÓN BOTTOM NAV ITEM
  * -------------------------
  * Cada item tiene:
@@ -115,14 +112,12 @@ import kotlin.reflect.KClass
  * - label: Texto que se muestra debajo del ícono
  * - selectedIcon: Ícono cuando el tab está seleccionado (filled)
  * - unselectedIcon: Ícono cuando el tab no está seleccionado (outlined)
-
-
+ *
  * ICONOS FILLED vs OUTLINED:
  * Es una convención de Material Design usar iconos filled para
  * el estado seleccionado y outlined para el no seleccionado.
  * Esto proporciona feedback visual claro al usuario.
-
-
+ *
  * 5. TYPE-SAFE NAVIGATION (Navigation 2.8+)
  * -----------------------------------------
  * En lugar de strings para las rutas, usamos tipos:
@@ -164,14 +159,12 @@ data class BottomNavItem(
 
 /**
  * Lista de items del BottomNavigation.
-
- * Nota: Para el ícono de Library usamos un recurso drawable personalizado
- * ya que Icons.Default no incluye un ícono de biblioteca de música apropiado.
- * Se usa el mismo ícono para ambos estados (selected/unselected) como fallback.
+ *
+ * CAMBIO PARTE 2:
+ * Se reemplazó "Library" por "Highlights" usando íconos de estrella (Star).
  */
 @Composable
 fun getBottomNavItems(): List<BottomNavItem> {
-    val libraryIcon = ImageVector.vectorResource(R.drawable.ic_library)
     return listOf(
         BottomNavItem(
             route = HomeDestination::class,
@@ -185,11 +178,12 @@ fun getBottomNavItems(): List<BottomNavItem> {
             selectedIcon = { Icons.Filled.Search },
             unselectedIcon = { Icons.Outlined.Search }
         ),
+        // CAMBIO: Highlights Tab
         BottomNavItem(
-            route = LibraryDestination::class,
-            label = "Library",
-            selectedIcon = { libraryIcon },
-            unselectedIcon = { libraryIcon }
+            route = HighlightsDestination::class,
+            label = "Highlights",
+            selectedIcon = { Icons.Filled.Star },
+            unselectedIcon = { Icons.Outlined.Star }
         )
     )
 }
@@ -249,7 +243,7 @@ fun StreamUIApp() {
     val topBarTitle = when {
         currentDestination?.hasRoute(HomeDestination::class) == true -> "StreamUI"
         currentDestination?.hasRoute(SearchDestination::class) == true -> "Search"
-        currentDestination?.hasRoute(LibraryDestination::class) == true -> "Your Library"
+        currentDestination?.hasRoute(HighlightsDestination::class) == true -> "Highlights" // CAMBIO: Título actualizado
         currentDestination?.hasRoute(PlayerDestination::class) == true -> "Now Playing"
         else -> "StreamUI"
     }
@@ -279,11 +273,8 @@ fun StreamUIApp() {
             /**
              * BOTTOM NAVIGATION BAR
              * NavigationBar es el componente Material 3 para bottom navigation.
-             * Diferencias con Material 2:
-             * - Material 2: BottomNavigation
-             * - Material 3: NavigationBar
              *
-             * Solo se muestra en los tabs principales (Home, Search, Library).
+             * Solo se muestra en los tabs principales (Home, Search, Highlights).
              */
             bottomBar = {
                 if (showBottomBar) {
@@ -304,29 +295,13 @@ fun StreamUIApp() {
                                 onClick = {
                                     /**
                                      * NAVEGACIÓN DE TABS
-                                     * La navegación entre tabs requiere opciones especiales:
-
-                                     * popUpTo(findStartDestination):
-                                     * - Limpia el back stack hasta el destino inicial
-                                     * - Evita que se acumulen múltiples screens
-
-                                     * saveState = true:
-                                     * - Guarda el estado del tab actual antes de salir
-                                     * - Preserva scroll position, campos de texto, etc.
-
-                                     * restoreState = true:
-                                     * - Restaura el estado del tab al que navegamos
-                                     * - El usuario vuelve donde estaba en ese tab
-
-                                     * launchSingleTop = true:
-                                     * - Evita crear múltiples instancias del mismo destino
-                                     * - Si ya estás en Home, tocar Home no crea otro Home
+                                     * La navegación entre tabs requiere opciones especiales.
                                      */
                                     navController.navigate(
                                         when (item.route) {
                                             HomeDestination::class -> HomeDestination
                                             SearchDestination::class -> SearchDestination
-                                            LibraryDestination::class -> LibraryDestination
+                                            HighlightsDestination::class -> HighlightsDestination // CAMBIO: Ruta actualizada
                                             else -> HomeDestination
                                         }
                                     ) {
@@ -353,7 +328,7 @@ fun StreamUIApp() {
             /**
              * NAVHOST: Contenedor de Navegación
              * NavHost define el grafo de navegación de la app.
-
+             *
              * Parámetros:
              * - navController: Controla la navegación
              * - startDestination: Destino inicial (HomeDestination)
@@ -365,21 +340,10 @@ fun StreamUIApp() {
             ) {
                 /**
                  * DESTINO: Home Screen
-                 * composable<T> define un destino para el tipo T.
-                 * HomeDestination es un object (sin argumentos),
-                 * por lo que el lambda no necesita extraer nada.
                  */
                 composable<HomeDestination> {
                     HomeScreen(
                         onSongClick = { song ->
-                            /**
-                             * NAVEGACIÓN TYPE-SAFE
-                             * Navegamos a PlayerDestination pasando el songId.
-
-                             * El compilador verifica que:
-                             * - PlayerDestination existe
-                             * - songId es del tipo correcto (String)
-                             */
                             navController.navigate(PlayerDestination(songId = song.id))
                         }
                     )
@@ -387,57 +351,34 @@ fun StreamUIApp() {
 
                 /**
                  * DESTINO: Search Screen
-                 * SearchDestination es un object (sin argumentos).
-
-                 * Esta pantalla es parte del BottomNavigation.
-                 * Permite buscar canciones y navegar al Player.
                  */
                 composable<SearchDestination> {
                     SearchScreen(
                         onSongClick = { song ->
-                            /**
-                             * REUTILIZACIÓN DE DESTINOS
-                             * Usamos el MISMO PlayerDestination que usa HomeScreen.
-
-                             * Esto demuestra que los destinos son reutilizables:
-                             * - No importa DESDE DÓNDE navegas
-                             * - Solo importa A DÓNDE vas y con qué datos
-                             */
                             navController.navigate(PlayerDestination(songId = song.id))
                         },
                         onBackClick = {
                             // En BottomNavigation, Search es un tab principal
-                            // No necesita back manual, el usuario usa los tabs
                         }
                     )
                 }
 
                 /**
-                 * DESTINO: Library Screen
-                 * -----------------------
-                 * LibraryDestination muestra las playlists del usuario.
-                 *
-                 * Es el tercer tab del BottomNavigation.
-                 * Actualmente solo muestra playlists sin navegación adicional.
+                 * DESTINO: Highlights Screen (Favoritos)
+                 * --------------------------------------
+                 * Reemplaza a LibraryScreen.
+                 * Muestra solo las canciones marcadas con corazón.
                  */
-                composable<LibraryDestination> {
-                    LibraryScreen(
-                        onPlaylistClick = { playlist ->
-                            // TODO: Navegar al detalle de la playlist
-                            // Por ahora no hace nada
+                composable<HighlightsDestination> {
+                    HighlightsScreen(
+                        onSongClick = { songId ->
+                            navController.navigate(PlayerDestination(songId = songId))
                         }
                     )
                 }
 
                 /**
                  * DESTINO: Player Screen
-                 * PlayerDestination es una data class con argumentos.
-
-                 * toRoute<T>() extrae los argumentos de forma type-safe.
-
-                 * El Player es una pantalla de detalle que se abre sobre
-                 * cualquier tab. El BottomNavigation se oculta cuando
-                 * estamos en esta pantalla.
                  */
                 composable<PlayerDestination> { backStackEntry ->
                     // Extrae los argumentos de navegación de forma type-safe
@@ -449,11 +390,6 @@ fun StreamUIApp() {
                     PlayerScreen(
                         song = song,
                         onBackClick = {
-                            /**
-                             * popBackStack()
-                             * Navega hacia atrás en el back stack.
-                             * Vuelve al tab desde donde se abrió el Player.
-                             */
                             navController.popBackStack()
                         }
                     )
