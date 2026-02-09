@@ -1,11 +1,15 @@
 package com.curso.android.module2.stream.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.curso.android.module2.stream.data.model.Song
 import com.curso.android.module2.stream.data.repository.MusicRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * ================================================================================
@@ -17,29 +21,30 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * COMPARACIÓN CON HOME VIEW MODEL:
  * --------------------------------
- * - HomeViewModel: Carga datos una vez al iniciar
+ * - HomeViewModel: Carga datos y los observa
  * - SearchViewModel: Responde a eventos continuos (cada tecla del usuario)
+ * Y TAMBIÉN observa cambios en los datos subyacentes (likes).
  *
  * FLUJO UDF EN BÚSQUEDA:
  * ----------------------
  *
- *     Usuario escribe "rock"
- *            │
- *            ▼
- *     ┌──────────────┐
- *     │  SearchScreen │ ─── onQueryChange("rock") ───▶ ┌────────────────┐
- *     └──────────────┘                                  │ SearchViewModel │
- *            ▲                                          └────────────────┘
- *            │                                                   │
- *            │                                          updateQuery("rock")
- *            │                                                   │
- *            │                                                   ▼
- *            │                                          Filtrar canciones
- *            │                                                   │
- *            │◀─────── StateFlow emite nuevo estado ────────────┘
- *            │         (query="rock", results=[...])
- *            │
- *     UI se recompone con resultados
+ * Usuario escribe "rock"
+ * │
+ * ▼
+ * ┌──────────────┐
+ * │  SearchScreen │ ─── onQueryChange("rock") ───▶ ┌────────────────┐
+ * └──────────────┘                                  │ SearchViewModel │
+ * ▲                                          └────────────────┘
+ * │                                                   │
+ * │                                          updateQuery("rock")
+ * │                                                   │
+ * │                                                   ▼
+ * │                                          Filtrar canciones
+ * │                                                   │
+ * │◀─────── StateFlow emite nuevo estado ────────────┘
+ * │         (query="rock", results=[...])
+ * │
+ * UI se recompone con resultados
  *
  * El flujo siempre es UNIDIRECCIONAL:
  * 1. UI envía evento (onQueryChange)
@@ -77,7 +82,7 @@ sealed interface SearchUiState {
      *
      * @property query Texto actual de búsqueda
      * @property results Lista de canciones que coinciden con la búsqueda
-     * @property allSongs Todas las canciones disponibles
+     * @property allSongs Todas las canciones disponibles (necesario para filtrar)
      */
     data class Success(
         val query: String = "",
@@ -148,28 +153,48 @@ class SearchViewModel(
      * Cargamos las canciones al iniciar, manejando posibles errores.
      */
     init {
-        loadSongs()
+        observeSongs()
     }
 
     /**
-     * Carga todas las canciones desde el repositorio.
+     * Observa todas las canciones desde el repositorio de forma REACTIVA.
      *
-     * MANEJO DE ERRORES
-     * -----------------
-     * Aunque con datos mock es improbable que falle, envolvemos
-     * en try-catch para:
-     * 1. Demostrar el patrón correcto
-     * 2. Estar preparados para implementaciones reales
-     * 3. Manejar casos edge (datos corruptos, etc.)
+     * MANEJO DE ERRORES Y FLUJO
+     * -------------------------
+     * En lugar de cargar una vez (loadSongs), observamos (collect).
+     * ¿Por qué?
+     * Si el usuario da "Like" en la pantalla Home, el repositorio cambia.
+     * Al observar aquí, la pantalla Search se entera automáticamente
+     * y actualiza el icono de corazón sin hacer nada extra.
      */
-    private fun loadSongs() {
-        try {
-            val allSongs = repository.getAllSongs()
-            _uiState.value = SearchUiState.Success(allSongs = allSongs)
-        } catch (e: Exception) {
-            _uiState.value = SearchUiState.Error(
-                message = e.message ?: "Error al cargar canciones"
-            )
+    private fun observeSongs() {
+        viewModelScope.launch {
+            try {
+                repository.getSongs().collectLatest { songs ->
+                    _uiState.update { currentState ->
+                        // Si ya estábamos en Success, preservamos la query del usuario
+                        val query = (currentState as? SearchUiState.Success)?.query ?: ""
+
+                        // Si hay una búsqueda activa, debemos re-filtrar con los NUEVOS datos
+                        // para que los resultados reflejen cambios (ej. likes)
+                        val results = if (query.isNotBlank()) {
+                            filterSongs(songs, query)
+                        } else {
+                            emptyList()
+                        }
+
+                        SearchUiState.Success(
+                            query = query,
+                            results = results,
+                            allSongs = songs
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = SearchUiState.Error(
+                    message = e.message ?: "Error al cargar canciones"
+                )
+            }
         }
     }
 
@@ -194,8 +219,8 @@ class SearchViewModel(
      * ```kotlin
      * // En la UI:
      * TextField(
-     *     value = (uiState as? SearchUiState.Success)?.query ?: "",
-     *     onValueChange = { viewModel.updateQuery(it) }
+     * value = (uiState as? SearchUiState.Success)?.query ?: "",
+     * onValueChange = { viewModel.updateQuery(it) }
      * )
      * ```
      */
@@ -208,7 +233,7 @@ class SearchViewModel(
             val results = if (query.isBlank()) {
                 emptyList()
             } else {
-                searchSongs(query)
+                filterSongs(currentState.allSongs, query)
             }
 
             /**
@@ -235,18 +260,27 @@ class SearchViewModel(
     /**
      * Busca canciones que coincidan con la consulta.
      *
+     * @param songs Lista de canciones donde buscar
      * @param query Texto a buscar
      * @return Lista de canciones que coinciden
      *
      * La búsqueda es case-insensitive y busca en título Y artista.
      */
-    private fun searchSongs(query: String): List<Song> {
+    private fun filterSongs(songs: List<Song>, query: String): List<Song> {
         val lowercaseQuery = query.lowercase()
 
-        return repository.getAllSongs().filter { song ->
+        return songs.filter { song ->
             song.title.lowercase().contains(lowercaseQuery) ||
                     song.artist.lowercase().contains(lowercaseQuery)
         }
+    }
+
+    /**
+     * Toggle Favorite
+     * Permite dar like desde la pantalla de búsqueda.
+     */
+    fun toggleFavorite(songId: String) {
+        repository.toggleFavorite(songId)
     }
 
     /**
@@ -277,17 +311,17 @@ class SearchViewModel(
      * En la UI:
      * ```kotlin
      * when (val state = uiState) {
-     *     is SearchUiState.Error -> {
-     *         ErrorScreen(
-     *             message = state.message,
-     *             onRetry = { viewModel.retry() }
-     *         )
-     *     }
-     *     // ...
+     * is SearchUiState.Error -> {
+     * ErrorScreen(
+     * message = state.message,
+     * onRetry = { viewModel.retry() }
+     * )
+     * }
+     * // ...
      * }
      * ```
      */
     fun retry() {
-        loadSongs()
+        observeSongs()
     }
 }

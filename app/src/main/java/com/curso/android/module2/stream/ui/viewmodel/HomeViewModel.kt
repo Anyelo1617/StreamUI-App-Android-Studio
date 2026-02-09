@@ -1,11 +1,15 @@
 package com.curso.android.module2.stream.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.curso.android.module2.stream.data.model.Category
 import com.curso.android.module2.stream.data.repository.MusicRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * ================================================================================
@@ -17,35 +21,35 @@ import kotlinx.coroutines.flow.asStateFlow
  * MVVM separa la aplicación en tres capas:
  *
  * 1. MODEL (data/):
- *    - Datos y lógica de negocio
- *    - Repository, Data Sources, Entities
- *    - No conoce la UI
+ * - Datos y lógica de negocio
+ * - Repository, Data Sources, Entities
+ * - No conoce la UI
  *
  * 2. VIEW (ui/screens/):
- *    - Composables que renderizan la UI
- *    - Observa el estado del ViewModel
- *    - Envía eventos de usuario al ViewModel
- *    - NO contiene lógica de negocio
+ * - Composables que renderizan la UI
+ * - Observa el estado del ViewModel
+ * - Envía eventos de usuario al ViewModel
+ * - NO contiene lógica de negocio
  *
  * 3. VIEWMODEL (ui/viewmodel/):
- *    - Puente entre Model y View
- *    - Expone estado observable (StateFlow)
- *    - Procesa eventos de la UI
- *    - Sobrevive cambios de configuración (rotación)
+ * - Puente entre Model y View
+ * - Expone estado observable (StateFlow)
+ * - Procesa eventos de la UI
+ * - Sobrevive cambios de configuración (rotación)
  *
  * FLUJO DE DATOS (UDF - Unidirectional Data Flow):
  * ------------------------------------------------
  *
- *     ┌─────────────────────────────────────────────┐
- *     │                                             │
- *     │    ┌──────────┐    State    ┌──────────┐   │
- *     │    │ViewModel │ ──────────▶ │   View   │   │
- *     │    └──────────┘             └──────────┘   │
- *     │         ▲                        │         │
- *     │         │       Events           │         │
- *     │         └────────────────────────┘         │
- *     │                                             │
- *     └─────────────────────────────────────────────┘
+ * ┌─────────────────────────────────────────────┐
+ * │                                             │
+ * │    ┌──────────┐    State    ┌──────────┐   │
+ * │    │ViewModel │ ──────────▶ │   View   │   │
+ * │    └──────────┘             └──────────┘   │
+ * │         ▲                        │         │
+ * │         │       Events           │         │
+ * │         └────────────────────────┘         │
+ * │                                             │
+ * └─────────────────────────────────────────────┘
  *
  * - STATE fluye del ViewModel a la View (UI observa StateFlow)
  * - EVENTS fluyen de la View al ViewModel (clicks, inputs, etc.)
@@ -112,7 +116,7 @@ sealed interface HomeUiState {
  * - Testing: Inyectar un FakeMusicRepository en tests
  * - Flexibilidad: Cambiar la implementación sin modificar el ViewModel
  * - Principio de Inversión de Dependencias (DIP): El ViewModel depende
- *   de una abstracción, no de una implementación concreta
+ * de una abstracción, no de una implementación concreta
  */
 class HomeViewModel(
     private val repository: MusicRepository
@@ -152,61 +156,70 @@ class HomeViewModel(
      * Inicialización del ViewModel.
      *
      * init {} se ejecuta cuando se crea el ViewModel.
-     * Aquí cargamos los datos iniciales.
-     *
-     * NOTA: En una app real con datos remotos, usarías
-     * viewModelScope.launch {} para operaciones asíncronas.
+     * Ahora llamamos a observeMusicData() para suscribirnos al flujo de datos.
      */
     init {
-        loadCategories()
+        observeMusicData()
     }
 
     /**
-     * Carga las categorías desde el repositorio.
+     * Observa los cambios en los datos del repositorio de forma reactiva.
      *
-     * En este ejemplo es síncrono porque usamos datos mock.
-     * En una app real sería:
+     * CAMBIO A REACTIVO (FLOW):
+     * -------------------------
+     * En lugar de pedir los datos una vez, nos "suscribimos" (collect) al flujo
+     * que provee el repositorio.
      *
-     * ```kotlin
-     * private fun loadCategories() {
-     *     viewModelScope.launch {
-     *         _uiState.value = HomeUiState.Loading
-     *         try {
-     *             val categories = repository.getCategories() // suspend fun
-     *             _uiState.value = HomeUiState.Success(categories)
-     *         } catch (e: Exception) {
-     *             _uiState.value = HomeUiState.Error(e.message ?: "Unknown error")
-     *         }
-     *     }
-     * }
-     * ```
+     * 1. `repository.getSongs()`: Es un Flow que emite cada vez que algo cambia (ej. un Like).
+     * 2. `collectLatest`: Cada vez que el Flow emite, ejecutamos este bloque.
+     * 3. Dentro del bloque, obtenemos la lista actualizada de categorías y actualizamos la UI.
+     *
+     * Esto asegura que la UI siempre esté sincronizada con la base de datos,
+     * sin necesidad de recargar manualmente.
      */
-    private fun loadCategories() {
-        // Simula un estado de carga breve
-        _uiState.value = HomeUiState.Loading
+    private fun observeMusicData() {
+        viewModelScope.launch {
+            _uiState.value = HomeUiState.Loading
 
-        // Carga los datos del repositorio
-        val categories = repository.getCategories()
-
-        // Actualiza el estado con los datos
-        _uiState.value = HomeUiState.Success(categories)
+            try {
+                // Suscripción al Flow del repositorio
+                repository.getSongs().collectLatest {
+                    // Nota: Aunque el flow emite canciones, usamos este evento como
+                    // señal para recargar la estructura completa de categorías actualizada.
+                    val categories = repository.getCategories()
+                    _uiState.update { HomeUiState.Success(categories) }
+                }
+            } catch (e: Exception) {
+                _uiState.update { HomeUiState.Error(e.message ?: "Unknown error") }
+            }
+        }
     }
 
     /**
-     * Recarga los datos (ejemplo de evento desde la UI).
+     * Recarga los datos (reinicia la observación).
      *
-     * La UI llamaría a este método en respuesta a una acción
-     * del usuario, como "pull to refresh".
-     *
-     * PATRÓN EVENT:
-     * La UI envía eventos al ViewModel:
-     * ```kotlin
-     * Button(onClick = { viewModel.refresh() }) {
-     *     Text("Refresh")
-     * }
-     * ```
+     * En un entorno puramente reactivo con Flows, "refrescar" suele ser innecesario
+     * porque los datos llegan solos, pero mantenemos el método por si se requiere
+     * reiniciar el flujo en caso de error.
      */
     fun refresh() {
-        loadCategories()
+        observeMusicData()
+    }
+
+    /**
+     * Cambia el estado de favorito de una canción.
+     *
+     * @param songId El ID de la canción a modificar.
+     *
+     * FLUJO DE INTERACCIÓN:
+     * 1. UI llama a toggleFavorite(id)
+     * 2. Repository actualiza la lista interna
+     * 3. Repository emite nuevo valor en el Flow getSongs()
+     * 4. observeMusicData() (arriba) detecta el cambio
+     * 5. ViewModel emite nuevo UI State
+     * 6. UI se recompone con el corazón actualizado
+     */
+    fun toggleFavorite(songId: String) {
+        repository.toggleFavorite(songId)
     }
 }

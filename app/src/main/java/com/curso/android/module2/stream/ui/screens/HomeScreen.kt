@@ -10,18 +10,27 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,22 +51,22 @@ import org.koin.compose.viewmodel.koinViewModel
  * ESTRUCTURA DE LAYOUTS ANIDADOS:
  * -------------------------------
  *
- *     ┌──────────────────────────────────────────┐
- *     │              LazyColumn                  │ ← Scroll vertical
- *     │  ┌────────────────────────────────────┐  │
- *     │  │  Sección "Rock Classics"           │  │
- *     │  │  ┌────┬────┬────┬────┬────┬───▶   │  │ ← LazyRow (scroll horizontal)
- *     │  │  │ 🎵 │ 🎵 │ 🎵 │ 🎵 │ 🎵 │       │  │
- *     │  │  └────┴────┴────┴────┴────┘       │  │
- *     │  └────────────────────────────────────┘  │
- *     │  ┌────────────────────────────────────┐  │
- *     │  │  Sección "Coding Focus"            │  │
- *     │  │  ┌────┬────┬────┬────┬────┬───▶   │  │
- *     │  │  │ 🎵 │ 🎵 │ 🎵 │ 🎵 │ 🎵 │       │  │
- *     │  │  └────┴────┴────┴────┴────┘       │  │
- *     │  └────────────────────────────────────┘  │
- *     │                   ▼                      │
- *     └──────────────────────────────────────────┘
+ * ┌──────────────────────────────────────────┐
+ * │              LazyColumn                  │ ← Scroll vertical
+ * │  ┌────────────────────────────────────┐  │
+ * │  │  Sección "Rock Classics"           │  │
+ * │  │  ┌────┬────┬────┬────┬────┬───▶   │  │ ← LazyRow (scroll horizontal)
+ * │  │  │ 🎵 │ 🎵 │ 🎵 │ 🎵 │ 🎵 │       │  │
+ * │  │  └────┴────┴────┴────┴────┘       │  │
+ * │  └────────────────────────────────────┘  │
+ * │  ┌────────────────────────────────────┐  │
+ * │  │  Sección "Coding Focus"            │  │
+ * │  │  ┌────┬────┬────┬────┬────┬───▶   │  │
+ * │  │  │ 🎵 │ 🎵 │ 🎵 │ 🎵 │ 🎵 │       │  │
+ * │  │  └────┴────┴────┴────┴────┘       │  │
+ * │  └────────────────────────────────────┘  │
+ * │                   ▼                      │
+ * └──────────────────────────────────────────┘
  *
  * LAZY LAYOUTS:
  * -------------
@@ -124,7 +133,9 @@ fun HomeScreen(
             is HomeUiState.Success -> {
                 HomeContent(
                     categories = state.categories,
-                    onSongClick = onSongClick
+                    onSongClick = onSongClick,
+                    // EVENTO: Pasamos el evento de toggle favorite al ViewModel
+                    onFavoriteClick = { song -> viewModel.toggleFavorite(song.id) }
                 )
             }
 
@@ -169,11 +180,13 @@ private fun ErrorContent(message: String) {
  *
  * @param categories Lista de categorías a mostrar
  * @param onSongClick Callback para clicks en canciones
+ * @param onFavoriteClick Callback para clicks en el corazón
  */
 @Composable
 private fun HomeContent(
     categories: List<Category>,
-    onSongClick: (Song) -> Unit
+    onSongClick: (Song) -> Unit,
+    onFavoriteClick: (Song) -> Unit
 ) {
     /**
      * LAZYCOLUMN: Lista Vertical Eficiente
@@ -206,7 +219,8 @@ private fun HomeContent(
         ) { category ->
             CategorySection(
                 category = category,
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                onFavoriteClick = onFavoriteClick
             )
         }
     }
@@ -221,7 +235,8 @@ private fun HomeContent(
 @Composable
 private fun CategorySection(
     category: Category,
-    onSongClick: (Song) -> Unit
+    onSongClick: (Song) -> Unit,
+    onFavoriteClick: (Song) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -255,7 +270,8 @@ private fun CategorySection(
             ) { song ->
                 SongCard(
                     song = song,
-                    onClick = { onSongClick(song) }
+                    onClick = { onSongClick(song) },
+                    onFavoriteClick = { onFavoriteClick(song) }
                 )
             }
         }
@@ -268,26 +284,55 @@ private fun CategorySection(
  * Tarjeta individual de una canción.
  *
  * @param song Datos de la canción
- * @param onClick Callback cuando se hace click
+ * @param onClick Callback cuando se hace click en la tarjeta
+ * @param onFavoriteClick Callback cuando se hace click en el corazón
  */
 @Composable
 private fun SongCard(
     song: Song,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onFavoriteClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
-            .width(120.dp)
+            .width(140.dp) // Ligeramente más ancho para acomodar el botón
             // clickable hace que toda la columna sea interactiva
             // También añade feedback visual (ripple effect)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Cover generado por código
-        SongCoverMock(
-            colorSeed = song.colorSeed,
-            size = 120.dp
-        )
+        // Cover generado por código + Botón Like Superpuesto
+        Box(
+            modifier = Modifier.size(140.dp)
+        ) {
+            // 1. Imagen de fondo
+            SongCoverMock(
+                colorSeed = song.colorSeed,
+                size = 140.dp
+            )
+
+            // 2. Botón de favorito flotante (arriba a la derecha)
+            Surface(
+                color = Color.Black.copy(alpha = 0.3f), // Fondo semitransparente para ver mejor el icono
+                shape = CircleShape,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(32.dp)
+            ) {
+                IconButton(
+                    onClick = onFavoriteClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = if (song.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = if (song.isFavorite) "Quitar de favoritos" else "Agregar a favoritos",
+                        tint = if (song.isFavorite) Color.Red else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
