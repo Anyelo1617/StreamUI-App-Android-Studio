@@ -144,4 +144,4 @@ Proyecto generado usando [Claude Code](https://claude.com/code) y adaptado por *
 
 
 Link al video explicativo:
-https://youtube.com/shorts/rmJ9Tr1I8IM?feature=share
+https://youtube.com/shorts/s3fPAc2XPWA?feature=share
