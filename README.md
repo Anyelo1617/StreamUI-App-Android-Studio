@@ -1,6 +1,7 @@
-# StreamUI - Módulo 2: Arquitectura y Navegación
+# 📱 Android Studio Module 2: Advanced State & Navigation
 
-Proyecto educativo de Android que demuestra la implementación de arquitectura MVVM, inyección de dependencias con Koin, y navegación tipada con Navigation Compose.
+Este repositorio contiene el proyecto práctico **Stream**, desarrollado con **Kotlin** y **Jetpack Compose**. El objetivo principal es demostrar el dominio de la arquitectura de navegación compleja, el paso de argumentos tipados y la gestión de estado compartido entre múltiples pantallas.
+
 
 ## Screenshots
 
@@ -10,138 +11,50 @@ Proyecto educativo de Android que demuestra la implementación de arquitectura M
   <img src="assets/screenshot_3.png" width="30%" />
 </p>
 
-### Demo Video
-Puedes ver el funcionamiento de la aplicación en el siguiente video: [StreamUI Demo](assets/module2.webm)
+## Tech Stack & Conceptos Clave
 
-## Presentación del Módulo
+* **Lenguaje:** Kotlin
+* **UI Toolkit:** Jetpack Compose (Material 3)
+* **Arquitectura:** MVVM (Model-View-ViewModel) + Repository Pattern
+* **Navegación:** Navigation Compose 2.8+ (Type-Safe con `@Serializable`)
+* **Gestión de Estado:** `StateFlow`, `collectAsState`, `State Hoisting`.
+* **Listas Eficientes:** `LazyColumn`, `LazyRow`.
+* **Persistencia de Datos (Mock):** Data Classes con estado mutable (`isFavorite`).
 
-Todos los conceptos teóricos, diagramas de arquitectura y explicaciones detalladas (MVVM, UDF, DI, Navigation Type-Safe) se encuentran en los slides:
+## 🎵 Proyecto: Stream Music App
 
-📄 [**Ver Presentación (Slides)**](slides/slides.md)
+Una aplicación de reproducción de música moderna que implementa un sistema de navegación completo y sincronización de datos en tiempo real entre pantallas.
 
+### Características Principales
 
-## Estructura del Proyecto
+* **Navegación Inferior (Bottom Navigation):** Implementación de un `Scaffold` con `NavigationBar` para transitar entre las secciones *Home*, *Search* y *Highlights*.
+* **Sistema de Favoritos (Highlights):**
+    * Funcionalidad de "Me gusta" (❤️) interactiva en cada tarjeta de canción.
+    * **Sincronización en tiempo real:** Al marcar una canción en el *Home*, aparece instantáneamente en la pestaña *Highlights*.
+    * Filtrado dinámico de listas basado en el estado del modelo.
+* **Navegación Type-Safe:** Paso de argumentos complejos (IDs de canciones) hacia la pantalla de *Player* utilizando objetos serializables en lugar de strings propensos a errores.
+* **Componentes Reutilizables:** Diseño modular con `SongCard` y `SongCoverMock` que se adaptan a diferentes contextos (listas horizontales o verticales).
 
-```
-com.curso.android.module2.stream/
-├── StreamApplication.kt      # Inicialización de Koin
-├── MainActivity.kt           # NavHost y navegación
-├── data/
-│   ├── model/
-│   │   └── Models.kt         # Song, Category (@Serializable)
-│   └── repository/
-│       ├── MusicRepository.kt      # Interface (abstracción)
-│       └── MockMusicRepository.kt  # Implementación con datos mock
-├── di/
-│   └── AppModule.kt          # Módulo de Koin (interface binding)
-└── ui/
-    ├── components/
-    │   └── SongCoverMock.kt  # Cover generado por código
-    ├── navigation/
-    │   └── Destinations.kt   # Rutas type-safe (Home, Search, Player)
-    ├── screens/
-    │   ├── HomeScreen.kt     # Grid de categorías (LazyColumn + LazyRow)
-    │   ├── SearchScreen.kt   # Búsqueda con estados Loading/Success/Error
-    │   └── PlayerScreen.kt   # Reproductor con controles
-    ├── theme/
-    │   └── Theme.kt
-    └── viewmodel/
-        ├── HomeViewModel.kt   # sealed interface UiState
-        └── SearchViewModel.kt # sealed interface UiState (consistente)
-```
+### Implementación Técnica
 
----
+* **Single Source of Truth:** Se utiliza un `Repository` centralizado. Las pantallas no guardan datos, solo observan los cambios. Esto permite que el estado de "Favorito" se comparta globalmente.
+* **Event Hoisting:** El componente `SongCard` es *stateless* (sin estado). No decide cuándo cambiar el ícono; en su lugar, propaga el evento `onFavoriteClick` hacia el `ViewModel`, que actualiza el modelo de datos.
+* **Type-Safe Navigation:** Uso de `kotlinx.serialization` para definir rutas como objetos (`HighlightsDestination`, `PlayerDestination`) garantizando seguridad de tipos en tiempo de compilación.
+* **Reactive UI:** La interfaz reacciona automáticamente a los cambios en el `isFavorite` del modelo de datos `Song`.
 
-## Notas Educativas
+## 📸 Cómo probar el proyecto
 
-### Interface para Repository (Testabilidad)
+1.  **Clonar el repositorio** en tu máquina local.
+2.  Abrir **Android Studio**.
+3.  Selecciona **File > Open** y elige la carpeta raíz del proyecto `Stream`.
+4.  Espera a que Gradle sincronice las dependencias.
+5.  Ejecuta el módulo **app** con el botón de Play ▶️ en un emulador (API 26 o superior).
 
-El proyecto implementa el **Principio de Inversión de Dependencias (DIP)** usando interfaces:
-
-```kotlin
-// Interface (abstracción)
-interface MusicRepository {
-    fun getCategories(): List<Category>
-    fun getSongById(songId: String): Song?
-    fun getAllSongs(): List<Song>
-}
-
-// Implementación concreta
-class MockMusicRepository : MusicRepository { ... }
-```
-
-**¿Por qué usar interfaces?**
-
-| Sin Interface | Con Interface |
-|---------------|---------------|
-| ViewModel depende de `MockMusicRepository` | ViewModel depende de `MusicRepository` |
-| Difícil de testear (acoplamiento fuerte) | Fácil de testear (inyectar fakes/mocks) |
-| Cambiar implementación requiere modificar ViewModel | Cambiar implementación solo requiere cambiar binding en Koin |
-
-En Koin, el binding se hace así:
-```kotlin
-singleOf(::MockMusicRepository) bind MusicRepository::class
-```
-
-> **Nota**: Los tests unitarios están fuera del alcance de este módulo educativo, pero la arquitectura está preparada para agregarlos fácilmente.
-
-### Sealed Interface para UI States
-
-Ambos ViewModels usan `sealed interface` para representar estados:
-
-```kotlin
-sealed interface SearchUiState {
-    data object Loading : SearchUiState
-    data class Success(...) : SearchUiState
-    data class Error(val message: String) : SearchUiState
-}
-```
-
-**Beneficios:**
-1. **Exhaustividad**: El compilador verifica que manejes todos los estados en `when`
-2. **Type-safety**: Cada estado tiene sus propios datos
-3. **Consistencia**: Mismo patrón en todos los ViewModels del proyecto
-4. **Preparación**: Listo para operaciones asíncronas (APIs, bases de datos)
-
----
-
-## Versiones de Dependencias
-
-| Dependencia | Versión |
-|-------------|---------|
-| Android Gradle Plugin | 8.8.0 |
-| Compose BOM | 2025.12.00 |
-| Navigation Compose | 2.9.6 |
-| Koin BOM | 4.1.1 |
-| Kotlinx Serialization | 1.9.0 |
-| Kotlin | 2.2.0 |
-| Target SDK | 36 |
-
----
-
-## Cómo Ejecutar
-
-1. Abrir el proyecto en Android Studio
-2. Sincronizar Gradle
-3. Ejecutar en un emulador o dispositivo (API 24+)
-
-No se requieren assets externos: todas las imágenes son generadas por código usando gradientes y íconos de Material.
-
----
-
-## Créditos
-
-Proyecto generado usando [Claude Code](https://claude.com/code) y adaptado por **Adrián Catalán**.
-
----
-
-## Recursos Adicionales
-
-- [Type-Safe Navigation - Android Developers](https://developer.android.com/guide/navigation/design/type-safety)
-- [Koin Documentation](https://insert-koin.io/docs/quickstart/android-compose/)
-- [State and Jetpack Compose](https://developer.android.com/develop/ui/compose/state)
-- [Navigation Compose](https://developer.android.com/develop/ui/compose/navigation)
-
+### Verificación de Funcionalidad
+1.  En la pantalla **Home**, toca el corazón de cualquier canción.
+2.  Navega a la pestaña **Highlights** (ícono de estrella ⭐).
+3.  Verifica que la canción seleccionada aparece allí.
+4.  Desmarca la canción en Highlights y comprueba que se actualiza en el Home.
 
 Link al video explicativo:
 https://youtube.com/shorts/s3fPAc2XPWA?feature=share
